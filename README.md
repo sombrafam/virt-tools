@@ -6,7 +6,12 @@ you would do with continers.
 
 ## How to use
 
+This is tested in ubuntu bionic
+
 ### KVM scrits
-  
+
 - cd into the kvm folder and run 'setup_kvm_tools.sh'
- - Instance password is 'tijolo22'
+  That will install all dependencies and configure your environment
+- run spawn-vm with the desired arguments, e.g.:
+  spaw-vm --name generic --vcpus 1 --mem 2048 --disk 30 --series bionic
+- Instance password is 'tijolo22'

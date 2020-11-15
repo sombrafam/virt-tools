@@ -1,7 +1,7 @@
 #!/bin/bash -xe
 
 # Install base packages
-apt-get install virtinst cloud-image-utils libvirt-clients nfs-kernel-server
+sudo apt-get install -y virtinst cloud-image-utils libvirt-clients nfs-kernel-server
 
 # Create required folders
 mkdir -p "${HOME}/VMScripts"
@@ -12,10 +12,21 @@ mkdir -p "${HOME}/bin"
 # Download base images
 pushd ${HOME}/VMStorage/Images
 echo "Downloading base images"
-wget https://cloud-images.ubuntu.com/trusty/current/trusty-server-cloudimg-amd64-disk1.img
-wget https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
-wget https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.img
-wget https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img
+if [ ! -f  ${HOME}/VMStorage/Images/trusty-server-cloudimg-amd64-disk1.img ]; then
+    wget https://cloud-images.ubuntu.com/trusty/current/trusty-server-cloudimg-amd64-disk1.img
+fi
+
+if [ ! -f  ${HOME}/VMStorage/Images/xenial-server-cloudimg-amd64-disk1.img ]; then
+    wget https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
+fi
+
+if [ ! -f  ${HOME}/VMStorage/Images/bionic-server-cloudimg-amd64.img ]; then
+    wget https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.img
+fi
+
+if [ ! -f  ${HOME}/VMStorage/Images/focal-server-cloudimg-amd64.img ]; then
+    wget https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img
+fi
 popd
 
 # Setup ssh keys
@@ -30,9 +41,14 @@ echo "PATH=\$PATH:${HOME}/bin" >> ${HOME}/.bashrc
 
 # Configure cloud init template
 LOCAL_USER_KEY=$(cat ${HOME}/.ssh/id_rsa.pub)
+
 # This shared folder must be shared through NFS in the host. Access should be
 # given to the sub-network the VMs will receive IP.
 SHARED_FOLDER__NAME="internal_git"
+mkdir -p ${HOME}/${SHARED_FOLDER__NAME}
+echo "${HOME}/${SHARED_FOLDER__NAME}  *(rw,sync,no_subtree_check,anonuid=1000,anongid=1000,all_squash)" \
+  | sudo tee -a /etc/exports
+sudo systemctl restart nfs-kernel-server
 
 cat << EOF > cloud-config-template
 #cloud-config
@@ -44,7 +60,7 @@ users:
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
     groups: sudo
     shell: /bin/bash
-    passwd: $6$uHJKDSG68qu4WnSQ$Jz13SwqtOPSRaLanTqYAlMdTpORMrzYl.tnGgGNSNBVmXDsv7/t2ibC3j2kC6/GGDMUKvBcbcX.ks2it1alKR0
+    passwd: \$6\$uHJKDSG68qu4WnSQ\$Jz13SwqtOPSRaLanTqYAlMdTpORMrzYl.tnGgGNSNBVmXDsv7/t2ibC3j2kC6/GGDMUKvBcbcX.ks2it1alKR0
     lock_passwd: false
 package_update: true
 packages:
@@ -59,4 +75,5 @@ write_files:
     path: /etc/fstab
     append: true
 hostname: ubuntu
+
 EOF
