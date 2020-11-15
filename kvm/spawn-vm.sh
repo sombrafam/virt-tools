@@ -51,6 +51,10 @@ while (($# > 0)); do
         --maas)
             MAAS=true
             ;;
+        --net)
+            NETWORK=$2
+            shift
+            ;;
         *)
             echo "Invalid input parameter: ${1}"
             exit 1
@@ -63,6 +67,7 @@ VCPUS=${VCPUS:-2}
 MEMORY=${MEMORY:-2048}
 DISK=${DISK:-20}
 SERIES=${SERIES:-"focal"}
+NETWORK=${NETWORK:-"default"}
 
 # cd ${BASE_FOLDER}
 echo "Updating cloud-init scripts"
@@ -80,7 +85,7 @@ if [ ! -f ${DISK_FOLDER}/vmdisk-${VMNAME}.qcow2 ]; then
         sudo qemu-img resize  ${DISK_FOLDER}/vmdisk-${VMNAME}.qcow2 "${DISK}"G
     fi
 else
-    echo "Warning: Disk image already exists for vm with name ${VMNAME}"
+    echo "Error: Disk image already exists for vm with name ${VMNAME}"
     exit 1
 fi
 
@@ -116,20 +121,20 @@ else
                 --os-variant ubuntu18.04 \
                 --virt-type kvm \
                 --graphics spice \
-                --network network=new-dhcp,model=e1000 \
+                --network network=$NETWORK,model=e1000 \
                 --import \
                 --check path_in_use=off \
                 --noautoconsole
 
-    ip_count=$(virsh domifaddr $VMNAME | grep ipv4 | wc -l)
+    ip_count=$(sudo virsh domifaddr $VMNAME | grep ipv4 | wc -l)
     echo -n "Waiting for machine to boot ."
     while [ $ip_count -ne 1 ]; do
         echo -n " ."
         sleep 1
-        ip_count=$(virsh domifaddr $VMNAME | grep ipv4 | wc -l)
+        ip_count=$(sudo virsh domifaddr $VMNAME | grep ipv4 | wc -l)
     done
     echo ""
-    ip=$(virsh domifaddr $VMNAME | awk '{if ($3 == "ipv4") print $4;}'|cut -d'/' -f1)
+    ip=$(sudo virsh domifaddr $VMNAME | awk '{if ($3 == "ipv4") print $4;}'|cut -d'/' -f1)
     ssh-keyscan -H -t rsa ubuntu@$ip >> ~/.ssh/known_hosts
     echo "Virtual server $VMNAME is ready at $ip!"
     echo "You can log in the instance with:"

@@ -1,7 +1,8 @@
 #!/bin/bash -xe
 
 # Install base packages
-sudo apt-get install -y virtinst cloud-image-utils libvirt-clients nfs-kernel-server
+sudo apt-get install -y virtinst cloud-image-utils libvirt-clients \
+  nfs-kernel-server libvirt-bin
 
 # Create required folders
 mkdir -p "${HOME}/VMScripts"
@@ -50,7 +51,7 @@ echo "${HOME}/${SHARED_FOLDER__NAME}  *(rw,sync,no_subtree_check,anonuid=1000,an
   | sudo tee -a /etc/exports
 sudo systemctl restart nfs-kernel-server
 
-cat << EOF > cloud-config-template
+cat << EOF > ${HOME}/VMScripts/cloud-config-template
 #cloud-config
 # user password is: tijolo22
 users:
