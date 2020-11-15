@@ -1,0 +1,23 @@
+#cloud-config
+users:
+  - name: ubuntu
+    ssh-authorized-keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDBZNSEkkkawPaeuwjJ6zn9z32i2t61OqGFwNnhrW5lRFPnMiHO0Dj6tYnAfvcVQYrXR/MaFV90oAHAzgClvGeB7RrUsT0YFOloCJTL86mu2lITymKGUqS8m1Uu+H5rdQXE6lf9fJNVJ2bzFPi+dJLLjE+GZmLRzi7XAJljVDgRfUFAMmMQySjAsTM908Zd9UeD3PO7oSnkJpw2N9gKg/Z8VXfrC1NQrGLLDEhuC9plsmxmTOoCp/GrRALX3ldTDwiARpnBSXondqqqP0GSDsE/xfq3+3MVO/+/hGK8zuIjsBgGWNErnmYdsgOttY2IHxXa77aF124eIkDavQdehWTX erlon@thinktad-t400
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    groups: sudo
+    shell: /bin/bash
+    passwd: $6$uHJKDSG68qu4WnSQ$Jz13SwqtOPSRaLanTqYAlMdTpORMrzYl.tnGgGNSNBVmXDsv7/t2ibC3j2kC6/GGDMUKvBcbcX.ks2it1alKR0
+    lock_passwd: false
+package_update: true
+packages:
+  - nfs-common
+runcmd:
+   - [mkdir, -p, /home/ubuntu/internal_git]
+   - [chown, -R, ubuntu.ubuntu, /home/ubuntu/internal_git]
+   - [mount, "192.168.122.1:/home/erlon/internal_git", /home/ubuntu/internal_git]
+write_files:
+  - content: |
+      192.168.122.1:/home/erlon/internal_git /home/ubuntu/internal_git nfs defaults 0 0
+    path: /etc/fstab
+    append: true
+hostname: ubuntu
