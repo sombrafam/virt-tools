@@ -15,11 +15,11 @@ AUTHORIZED_KEYS=$HOME/.ssh/authorized_keys
 grep "$(cat $PUBKEY)" $AUTHORIZED_KEYS -qs || cat $PUBKEY >> $AUTHORIZED_KEYS
 
 # create a profile to control this, name it after $USER
-lxc profile create $USER &> /dev/null || true
+sudo lxc profile create $USER &> /dev/null || true
 
 # configure profile
 # this will rewrite the whole profile
-cat << EOF | lxc profile edit $USER
+cat << EOF | sudo lxc profile edit $USER
 name: $USER
 description: allow home dir mounting for $USER
 config:
