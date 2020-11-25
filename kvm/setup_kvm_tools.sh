@@ -38,6 +38,7 @@ fi
 rm -rf ${HOME}/bin/spawn-vm
 ln -s $(realpath spawn-vm.sh) "${HOME}/bin/spawn-vm"
 
+export PATH=$PATH:${HOME}/bin
 echo "PATH=\$PATH:${HOME}/bin" >> ${HOME}/.bashrc
 
 # Configure cloud init template
@@ -48,11 +49,8 @@ LOCAL_USER_KEY=$(cat ${HOME}/.ssh/id_rsa.pub)
 SHARED_FOLDER__NAME="internal_git"
 mkdir -p ${HOME}/${SHARED_FOLDER__NAME}
 
-# TODO(erlon): Check for duplicated entries before adding the line. The restart
-#   command will fail and the script abort if there are duplicated entries.
-echo "${HOME}/${SHARED_FOLDER__NAME}  *(rw,sync,no_subtree_check,anonuid=1000,anongid=1000,all_squash)" \
-  | sudo tee -a /etc/exports
-sudo systemctl restart nfs-kernel-server
+grep "${HOME}/${SHARED_FOLDER__NAME}" /etc/exports || echo "${HOME}/${SHARED_FOLDER__NAME}  *(rw,sync,no_subtree_check,anonuid=1000,anongid=1000,all_squash)" \
+  | sudo tee -a /etc/exports && sudo systemctl restart nfs-kernel-server
 
 cat << EOF > ${HOME}/VMScripts/cloud-config-template
 #cloud-config
