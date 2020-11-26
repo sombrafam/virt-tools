@@ -11,24 +11,22 @@ mkdir -p "${HOME}/VMStorage/Disks"
 mkdir -p "${HOME}/bin"
 
 # Download base images
-pushd ${HOME}/VMStorage/Images
 echo "Downloading base images"
 if [ ! -f  ${HOME}/VMStorage/Images/trusty-server-cloudimg-amd64-disk1.img ]; then
-    wget https://cloud-images.ubuntu.com/trusty/current/trusty-server-cloudimg-amd64-disk1.img
+    wget https://cloud-images.ubuntu.com/trusty/current/trusty-server-cloudimg-amd64-disk1.img -P "${HOME}/VMStorage/Images"
 fi
 
 if [ ! -f  ${HOME}/VMStorage/Images/xenial-server-cloudimg-amd64-disk1.img ]; then
-    wget https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img
+    wget https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img -P "${HOME}/VMStorage/Images"
 fi
 
 if [ ! -f  ${HOME}/VMStorage/Images/bionic-server-cloudimg-amd64.img ]; then
-    wget https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.img
+    wget https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.img -P "${HOME}/VMStorage/Images"
 fi
 
 if [ ! -f  ${HOME}/VMStorage/Images/focal-server-cloudimg-amd64.img ]; then
-    wget https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img
+    wget https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img -P "${HOME}/VMStorage/Images"
 fi
-popd
 
 # Setup ssh keys
 if [ ! -f  ${HOME}/.ssh/id_rsa.pub ]; then
