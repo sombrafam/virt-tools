@@ -79,7 +79,8 @@ rm ${BASE_FOLDER}/cloud-config
 if [ ! -f ${DISK_FOLDER}/vmdisk-${VMNAME}.qcow2 ]; then
     echo "Creating disk images..."
     if [ ${MAAS} == "true" ]; then
-        sudo qemu-img create -f qcow2 ${DISK_FOLDER}/vmdisk-${VMNAME}.qcow2 "${DISK}"G
+        sudo qemu-img create -f qcow2 ${DISK_FOLDER}/vmdisk-${VMNAME}-root.qcow2 "${DISK}"G
+        sudo qemu-img create -f qcow2 ${DISK_FOLDER}/vmdisk-${VMNAME}-01.qcow2 20G
     else
         sudo qemu-img convert -f qcow2 -O qcow2 ${IMAGES[${SERIES}]} ${DISK_FOLDER}/vmdisk-${VMNAME}.qcow2
         sudo qemu-img resize  ${DISK_FOLDER}/vmdisk-${VMNAME}.qcow2 "${DISK}"G
@@ -95,7 +96,8 @@ if [ ${MAAS} == "true" ]; then
                 --name $VMNAME \
                 --memory $MEMORY \
                 --vcpus $VCPUS \
-                --disk path=${DISK_FOLDER}/vmdisk-${VMNAME}.qcow2,format=qcow2,device=disk,bus=sata \
+                --disk path=${DISK_FOLDER}/vmdisk-${VMNAME}-root.qcow2,format=qcow2,device=disk,bus=sata \
+                --disk path=${DISK_FOLDER}/vmdisk-${VMNAME}-01.qcow2,format=qcow2,device=disk,bus=sata \
                 --disk path=${DISK_FOLDER}/vmconfigs-${VMNAME}.iso,device=cdrom \
                 --pxe --boot hd,network \
                 --os-type linux \
