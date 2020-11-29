@@ -100,9 +100,9 @@ if [ ${MAAS} == "true" ]; then
     # We need toset that with some logic so we can indentify what network a
     # card is on from its MACs address
     hex1=$(printf '%x\n' $(echo $RANDOM))
-    hex1=${hex:0:2}
+    hex1=${hex1:0:2}
     hex2=$(printf '%x\n' $(echo $RANDOM))
-    hex2=${hex:0:2}
+    hex2=${hex2:0:2}
     sudo virt-install \
                 --name $VMNAME \
                 --memory $MEMORY \
