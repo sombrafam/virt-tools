@@ -34,7 +34,7 @@ if [ ! -f  ${HOME}/.ssh/id_rsa.pub ]; then
 fi
 
 rm -rf ${HOME}/bin/spawn-vm
-ln -s $(realpath spawn-vm.sh) "${HOME}/bin/spawn-vm"
+ln -s "$(dirname $0)/spawn-vm.sh" "${HOME}/bin/spawn-vm"
 
 export PATH=$PATH:${HOME}/bin
 echo "PATH=\$PATH:${HOME}/bin" >> ${HOME}/.bashrc
