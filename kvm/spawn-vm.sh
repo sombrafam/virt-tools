@@ -92,6 +92,17 @@ fi
 
 echo "Booting VM ..."
 if [ ${MAAS} == "true" ]; then
+    # Chooses a random number, convert it to hex and get the first 2 digits.
+    # There is a scarse change that we can colide MACs in the same network, but
+    # given the complexity to manage that, it worh the risks given that changes
+    # are really small, the number of machines in the system is small and its a
+    # development system.
+    # We need toset that with some logic so we can indentify what network a
+    # card is on from its MACs address
+    hex1=$(printf '%x\n' $(echo $RANDOM))
+    hex1=${hex:0:2}
+    hex2=$(printf '%x\n' $(echo $RANDOM))
+    hex2=${hex:0:2}
     sudo virt-install \
                 --name $VMNAME \
                 --memory $MEMORY \
@@ -104,12 +115,12 @@ if [ ${MAAS} == "true" ]; then
                 --os-variant ubuntu18.04 \
                 --virt-type kvm \
                 --graphics spice \
-                --network=network=maas-oam,model=virtio \
-                --network=network=maas-admin,model=virtio \
-                --network=network=maas-public,model=virtio \
-                --network=network=maas-internal,model=virtio \
-                --network=network=maas-ext,model=virtio \
-                --network=network=maas-k8s,model=virtio \
+                --network=network=maas-oam,model=virtio,mac="52:54:00:${hex1}:${hex2}:10" \
+                --network=network=maas-admin,model=virtio,mac="52:54:00:${hex1}:${hex2}:20" \
+                --network=network=maas-public,model=virtio,mac="52:54:00:${hex1}:${hex2}:30" \
+                --network=network=maas-internal,model=virtio,mac="52:54:00:${hex1}:${hex2}:40" \
+                --network=network=maas-ext,model=virtio,mac="52:54:00:${hex1}:${hex2}:50" \
+                --network=network=maas-k8s,model=virtio,mac="52:54:00:${hex1}:${hex2}:60" \
                 --check path_in_use=off \
                 --noautoconsole
 else
