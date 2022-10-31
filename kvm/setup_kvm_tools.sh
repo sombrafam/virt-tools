@@ -28,6 +28,10 @@ if [ ! -f  ${HOME}/VMStorage/Images/focal-server-cloudimg-amd64.img ]; then
     wget https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img -P "${HOME}/VMStorage/Images"
 fi
 
+if [ ! -f  ${HOME}/VMStorage/Images/jammy-server-cloudimg-amd64.img ]; then
+    wget https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img -P "${HOME}/VMStorage/Images"
+fi
+
 # Setup ssh keys
 if [ ! -f  ${HOME}/.ssh/id_rsa.pub ]; then
     ssh-keygen -b 2048 -t rsa -q -N "" -f "${HOME}/.ssh/id_rsa"

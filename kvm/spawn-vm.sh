@@ -11,6 +11,7 @@ IMAGES["trusty"]="${IMAGE_FOLDER}/trusty-server-cloudimg-amd64-disk1.img"
 IMAGES["xenial"]="${IMAGE_FOLDER}/xenial-server-cloudimg-amd64-disk1.img"
 IMAGES["bionic"]="${IMAGE_FOLDER}/bionic-server-cloudimg-amd64.img"
 IMAGES["focal"]="${IMAGE_FOLDER}/focal-server-cloudimg-amd64.img"
+IMAGES["jammy"]="${IMAGE_FOLDER}/jammy-server-cloudimg-amd64.img"
 
 usage() {
     echo "Usage: $0 --name <hostname> --vcpus <vcpus> --mem <memory MB> --disk <disk GB> [--series <trusty|xenial|bionic|focal>]"
