@@ -1,6 +1,7 @@
 #!/bin/bash -xe
 
 # Install base packages
+sudo apt-get update
 sudo apt-get install -y virtinst cloud-image-utils libvirt-clients \
   nfs-kernel-server qemu-kvm libvirt-daemon-system libvirt-clients \
   bridge-utils virt-manager libguestfs-tools libosinfo-bin
