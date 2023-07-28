@@ -6,6 +6,7 @@ users:
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
     groups: sudo
     shell: /bin/bash
+    # passwd is: tijolo22
     passwd: $6$uHJKDSG68qu4WnSQ$Jz13SwqtOPSRaLanTqYAlMdTpORMrzYl.tnGgGNSNBVmXDsv7/t2ibC3j2kC6/GGDMUKvBcbcX.ks2it1alKR0
     lock_passwd: false
 package_update: true

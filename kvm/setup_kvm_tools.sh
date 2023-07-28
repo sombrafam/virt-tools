@@ -2,7 +2,9 @@
 
 # Install base packages
 sudo apt-get install -y virtinst cloud-image-utils libvirt-clients \
-  nfs-kernel-server libvirt-bin
+  nfs-kernel-server qemu-kvm libvirt-daemon-system libvirt-clients \
+  bridge-utils virt-manager libguestfs-tools libosinfo-bin
+
 
 # Create required folders
 mkdir -p "${HOME}/VMScripts"
@@ -31,6 +33,7 @@ fi
 if [ ! -f  ${HOME}/VMStorage/Images/jammy-server-cloudimg-amd64.img ]; then
     wget https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img -P "${HOME}/VMStorage/Images"
 fi
+
 
 # Setup ssh keys
 if [ ! -f  ${HOME}/.ssh/id_rsa.pub ]; then
@@ -64,6 +67,7 @@ users:
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
     groups: sudo
     shell: /bin/bash
+    # password: tijolo22
     passwd: \$6\$uHJKDSG68qu4WnSQ\$Jz13SwqtOPSRaLanTqYAlMdTpORMrzYl.tnGgGNSNBVmXDsv7/t2ibC3j2kC6/GGDMUKvBcbcX.ks2it1alKR0
     lock_passwd: false
 package_update: true
