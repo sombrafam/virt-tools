@@ -69,12 +69,15 @@ MEMORY=${MEMORY:-2048}
 DISK=${DISK:-20}
 SERIES=${SERIES:-"focal"}
 NETWORK=${NETWORK:-"default"}
+USER=$(whoami)
 
 # cd ${BASE_FOLDER}
 echo "Updating cloud-init scripts"
 cp ${BASE_FOLDER}/cloud-config-template ${BASE_FOLDER}/cloud-config
 sed -i "s/hostname:.*/hostname: ${VMNAME}/g" ${BASE_FOLDER}/cloud-config
-sudo cloud-localds ${DISK_FOLDER}/vmconfigs-${VMNAME}.iso ${BASE_FOLDER}/cloud-config
+cloud-localds ${DISK_FOLDER}/vmconfigs-${VMNAME}.iso ${BASE_FOLDER}/cloud-config
+sudo chown ${USER}:${USER} ${DISK_FOLDER}/vmconfigs-${VMNAME}.iso
+sudo setfacl -m u:libvirt-qemu:rwx ${DISK_FOLDER}/vmconfigs-${VMNAME}.iso
 rm ${BASE_FOLDER}/cloud-config
 
 if [ ! -f ${DISK_FOLDER}/vmdisk-${VMNAME}.qcow2 ]; then
@@ -82,13 +85,18 @@ if [ ! -f ${DISK_FOLDER}/vmdisk-${VMNAME}.qcow2 ]; then
     if [ ${MAAS} == "true" ]; then
         sudo qemu-img create -f qcow2 ${DISK_FOLDER}/vmdisk-${VMNAME}-root.qcow2 "${DISK}"G
         sudo qemu-img create -f qcow2 ${DISK_FOLDER}/vmdisk-${VMNAME}-01.qcow2 20G
+        sudo chown ${USER}:${USER} ${DISK_FOLDER}/vmdisk-${VMNAME}-root.qcow2
+        sudo chown ${USER}:${USER} ${DISK_FOLDER}/vmdisk-${VMNAME}-01.qcow2
+        sudo setfacl -m u:libvirt-qemu:rwx ${DISK_FOLDER}/vmdisk-${VMNAME}-root.qcow2
+        sudo setfacl -m u:libvirt-qemu:rwx ${DISK_FOLDER}/vmdisk-${VMNAME}-01.qcow2
     else
         sudo qemu-img convert -f qcow2 -O qcow2 ${IMAGES[${SERIES}]} ${DISK_FOLDER}/vmdisk-${VMNAME}.qcow2
         sudo qemu-img resize  ${DISK_FOLDER}/vmdisk-${VMNAME}.qcow2 "${DISK}"G
+        sudo chown ${USER}:${USER} ${DISK_FOLDER}/vmdisk-${VMNAME}.qcow2
+        sudo setfacl -m u:libvirt-qemu:rwx ${DISK_FOLDER}/vmdisk-${VMNAME}.qcow2
     fi
 else
-    echo "Error: Disk image already exists for vm with name ${VMNAME}"
-    exit 1
+    echo "Warning: Disk image already exists for vm with name ${VMNAME}"
 fi
 
 echo "Booting VM ..."

@@ -4,7 +4,7 @@
 sudo apt-get update
 sudo apt-get install -y virtinst cloud-image-utils libvirt-clients \
   nfs-kernel-server qemu-kvm libvirt-daemon-system libvirt-clients \
-  bridge-utils virt-manager libguestfs-tools libosinfo-bin
+  bridge-utils virt-manager libguestfs-tools libosinfo-bin acl
 
 
 # Create required folders
@@ -86,3 +86,17 @@ write_files:
 hostname: ubuntu
 
 EOF
+
+
+# Add ubuntu into libvirt-qemu, libvirt and libvirt-dnsmasq groups
+for group in libvirt-qemu libvirt libvirt-dnsmasq kvm; do
+    sudo grep -q "^${group}:" /etc/group || sudo groupadd "${group}"
+done
+
+# Add user to groups and set permissions to VMStorage folder
+for folder in ${HOME}/ ${HOME}/VMStorage ${HOME}/VMStorage/Images ${HOME}/VMStorage/Disks ${HOME}/VMScripts; do
+    for group in libvirt-qemu libvirt libvirt-dnsmasq kvm; do
+        sudo setfacl -m u:"${group}":rwX "${folder}"
+    done
+done
+
