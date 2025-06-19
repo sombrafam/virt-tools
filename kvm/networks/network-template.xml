@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<network>
+  <name>__NETWORK_NAME__</name>
+  <forward mode='bridge'/>
+  <bridge name='__BRIDGE_NAME__'/>
+  <port isolated='no'/>
+</network>
