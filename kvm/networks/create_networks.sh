@@ -7,6 +7,8 @@ BRIDGES=("oam:10" "admin:20" "public:30" "internal:40" "ext:50" "k8s:60")
 NETWORK_PREFIX="10.10"
 XML_TEMPLATE_FILE="$(dirname "$0")/network-template.xml"
 XML_OUTPUT_DIR="."
+EXTERNAL_NIC=""
+USE_VLANS=false
 
 # Help function
 show_help() {
@@ -17,6 +19,8 @@ show_help() {
     echo "  -b, --bridge NAME:ID      Add bridge with VLAN ID (e.g., oam:10,admin:20)"
     echo "  -p, --prefix PREFIX       Network prefix (default: 10.10)"
     echo "  -o, --output-dir DIR      Directory to store generated XML files (default: current directory)"
+    echo "  -e, --external-nic DEV External device used for internet access (e.g., eth0)"
+    echo "  --use-vlans               Configure VLANs for bridges with physical devices"
     echo "  --help                    Show this help message"
     exit 0
 }
@@ -44,6 +48,14 @@ while [[ $# -gt 0 ]]; do
         -o|--output-dir)
             XML_OUTPUT_DIR="$2"
             shift 2
+            ;;
+        -e|--external-nic)
+            EXTERNAL_NIC="$2"
+            shift 2
+            ;;
+        --use-vlans)
+            USE_VLANS=true
+            shift
             ;;
         --help)
             show_help
@@ -103,7 +115,7 @@ ip_is_configured() {
 
 # Function to check if network exists in virsh
 virsh_net_exists() {
-    virsh net-info $1 &>/dev/null
+    sudo virsh net-info $1 &>/dev/null
     return $?
 }
 
@@ -125,123 +137,121 @@ create_network_xml() {
     fi
 }
 
-# Create network vlans
-for bridge in "${BRIDGES[@]}"; do
-    IFS=':' read -r br id <<< "$bridge"
+# Configure firewall and NAT
+configure_firewall() {
+    local br="$1"
+    local dev="$2"
+    local id="$3"
     
-    # Skip VLAN creation if no device is mapped to this bridge
-    if [ -z "${DEVICE_MAP[$br]}" ]; then
-        echo "No physical device mapped to bridge $br, skipping VLAN creation"
-        continue
-    fi
+    # Enable IP forwarding
+    sudo sh -c "echo 1 > /proc/sys/net/ipv4/ip_forward"
     
-    NETDEV=${DEVICE_MAP[$br]}
-    if ! vlan_exists $id; then
-        echo "Creating VLAN $id for bridge $br on device $NETDEV"
-        sudo ip link add link ${NETDEV} name vlan${id} type vlan id ${id}
-        sudo ip link set dev vlan${id} up
+    # Add firewall rules for the bridge
+    sudo iptables -I FORWARD -i "${br}" -o "${br}" -j ACCEPT
+    
+    # If this bridge has a physical device mapped to it
+    if [ -n "$dev" ]; then
+        # Allow traffic from bridge to physical device and back
+        sudo iptables -I FORWARD -i "${br}" -o "${dev}" -j ACCEPT
+        sudo iptables -I FORWARD -i "${dev}" -o "${br}" -j ACCEPT
+        
+        # No NAT needed for bridges with physical devices
+        echo "Bridge ${br} has physical device ${dev}, no NAT needed"
+    # If external device is specified and this bridge doesn't have a physical device
+    elif [ -n "$EXTERNAL_NIC" ]; then
+        # Allow traffic from bridge to external device and back
+        sudo iptables -I FORWARD -i "${br}" -o "${EXTERNAL_NIC}" -j ACCEPT
+        sudo iptables -I FORWARD -i "${EXTERNAL_NIC}" -o "${br}" -j ACCEPT
+        
+        # Set up NAT for outbound traffic from bridge to external device
+        sudo iptables -t nat -I POSTROUTING -s "${NETWORK_PREFIX}.${id}.0/24" -o "${EXTERNAL_NIC}" -j MASQUERADE
+        echo "Bridge ${br} using external device ${EXTERNAL_NIC} for NAT"
     else
-        echo "VLAN $id already exists, checking status"
-        if ! ip link show vlan${id} | grep -q "UP"; then
-            echo "Setting VLAN $id up"
-            sudo ip link set dev vlan${id} up
-        fi
+        echo "Bridge ${br} has no physical device and no external device specified, no NAT configured"
     fi
-done
+}
 
-# Create bridges and configure networks
+# Create network vlans
 for bridge in "${BRIDGES[@]}"; do
     IFS=':' read -r br id <<< "$bridge"
     NET_NAME="${br}"
 
     # Set IP address based on host mapping
     IP_ADDR="${NETWORK_PREFIX}.${id}.${HOST_IP}/24"
-
-    # Check if bridge exists
-    if ! bridge_exists $NET_NAME; then
-        echo "Creating bridge $NET_NAME"
-        sudo brctl addbr $NET_NAME
-
-        # Add physical interface to bridge if mapped
-        if [ -n "${DEVICE_MAP[$br]}" ]; then
-            if ! ip link show vlan${id} | grep -q "master"; then
-                echo "Adding vlan${id} to bridge $NET_NAME"
-                sudo brctl addif $NET_NAME vlan${id}
-            else
-                echo "VLAN ${id} is already part of a bridge, skipping addition"
-            fi
-        else
-            echo "No physical device mapped to bridge $NET_NAME, creating standalone bridge"
-        fi
-
-        if [ -n "$IP_ADDR" ]; then
-            echo "Setting IP $IP_ADDR on $NET_NAME"
-            sudo ip addr add $IP_ADDR dev $NET_NAME
-            sudo ip link set dev $NET_NAME up
-        fi
-    else
-        echo "Bridge $NET_NAME already exists, checking configuration"
-
-        # Only manage VLAN interface if this bridge has a physical device mapped
-        if [ -n "${DEVICE_MAP[$br]}" ]; then
-            # Check if VLAN is already part of this bridge
-            if ! ip link show vlan${id} | grep -q "master $NET_NAME"; then
-                # Check if VLAN is part of another bridge
-                if ip link show vlan${id} | grep -q "master"; then
-                    echo "VLAN ${id} is already part of another bridge, please check configuration manually"
-                else
-                    echo "Adding vlan${id} to bridge $NET_NAME"
-                    sudo brctl addif $NET_NAME vlan${id}
-                fi
-            fi
-        fi
-
-        # Check if bridge is up
-        if ! ip link show $NET_NAME | grep -q "UP"; then
-            echo "Setting bridge $NET_NAME up"
-            sudo ip link set dev $NET_NAME up
-        fi
-
-        # Check if IP is correctly configured
-        if [ -n "$IP_ADDR" ]; then
-            IP_WITHOUT_MASK=$(echo $IP_ADDR | cut -d'/' -f1)
-            if ! ip_is_configured $NET_NAME $IP_WITHOUT_MASK; then
-                echo "IP address $IP_ADDR not found on $NET_NAME, adding it"
-                sudo ip addr add $IP_ADDR dev $NET_NAME
-            else
-                echo "IP address correctly configured on $NET_NAME"
-            fi
-        fi
-    fi
-
-    # Check if firewall rules already exist
-    NETWORK="${NETWORK_PREFIX}.${id}.0/24"
     
-    if ! sudo iptables -C FORWARD -s ${NETWORK} -j ACCEPT &>/dev/null; then
-        echo "Adding firewall rule for source network ${NETWORK}"
-        sudo iptables -I FORWARD -s ${NETWORK} -j ACCEPT
-    else
-        echo "Firewall rule for source network ${NETWORK} already exists"
-    fi
-
-    if ! sudo iptables -C FORWARD -d ${NETWORK} -j ACCEPT &>/dev/null; then
-        echo "Adding firewall rule for destination network ${NETWORK}"
-        sudo iptables -I FORWARD -d ${NETWORK} -j ACCEPT
-    else
-        echo "Firewall rule for destination network ${NETWORK} already exists"
-    fi
-
-    # Only add NAT rules if this bridge has a physical device mapped
+    # Check if this bridge has a device mapped to it
     if [ -n "${DEVICE_MAP[$br]}" ]; then
-        if ! sudo iptables -t nat -C POSTROUTING -o ${DEVICE_MAP[$br]} -s ${NETWORK} -j MASQUERADE &>/dev/null; then
-            echo "Adding NAT masquerade rule for network ${NETWORK}"
-            sudo iptables -t nat -I POSTROUTING -o ${DEVICE_MAP[$br]} -s ${NETWORK} -j MASQUERADE
+        DEVICE="${DEVICE_MAP[$br]}"
+        echo "Setting up bridge $NET_NAME with device $DEVICE"
+        
+        # Create bridge if it doesn't exist
+        if ! ip link show "$NET_NAME" &>/dev/null; then
+            echo "Creating bridge $NET_NAME"
+            sudo ip link add name "$NET_NAME" type bridge
+            sudo ip link set dev "$NET_NAME" up
         else
-            echo "NAT masquerade rule for network ${NETWORK} already exists"
+            echo "Bridge $NET_NAME already exists"
+        fi
+        
+        # Configure VLAN only if --use-vlans is specified
+        if $USE_VLANS; then
+            # Create VLAN interface if it doesn't exist
+            VLAN_IF="${DEVICE}.${id}"
+            if ! ip link show "$VLAN_IF" &>/dev/null; then
+                echo "Creating VLAN interface $VLAN_IF"
+                sudo ip link add link "$DEVICE" name "$VLAN_IF" type vlan id "$id"
+                sudo ip link set dev "$VLAN_IF" up
+            else
+                echo "VLAN interface $VLAN_IF already exists"
+            fi
+            
+            # Add VLAN interface to bridge if not already added
+            if ! ip link show "$VLAN_IF" | grep -q "master $NET_NAME"; then
+                echo "Adding VLAN interface $VLAN_IF to bridge $NET_NAME"
+                sudo ip link set dev "$VLAN_IF" master "$NET_NAME"
+            else
+                echo "VLAN interface $VLAN_IF already added to bridge $NET_NAME"
+            fi
+        else
+            # If not using VLANs, add the physical device directly to the bridge
+            if ! ip link show "$DEVICE" | grep -q "master $NET_NAME"; then
+                echo "Adding device $DEVICE directly to bridge $NET_NAME (no VLAN)"
+                sudo ip link set dev "$DEVICE" master "$NET_NAME"
+            else
+                echo "Device $DEVICE already added to bridge $NET_NAME"
+            fi
+        fi
+        
+        # Set IP address on bridge
+        if ! ip addr show dev "$NET_NAME" | grep -q "$IP_ADDR"; then
+            echo "Setting IP address $IP_ADDR on bridge $NET_NAME"
+            sudo ip addr add "$IP_ADDR" dev "$NET_NAME"
+        else
+            echo "IP address $IP_ADDR already set on bridge $NET_NAME"
         fi
     else
-        echo "No physical device mapped to bridge $br, skipping NAT masquerade rule"
+        echo "No device mapped to bridge $NET_NAME, creating a virtual bridge"
+        
+        # Create bridge if it doesn't exist
+        if ! ip link show "$NET_NAME" &>/dev/null; then
+            echo "Creating bridge $NET_NAME"
+            sudo ip link add name "$NET_NAME" type bridge
+            sudo ip link set dev "$NET_NAME" up
+        else
+            echo "Bridge $NET_NAME already exists"
+        fi
+        
+        # Set IP address on bridge
+        if ! ip addr show dev "$NET_NAME" | grep -q "$IP_ADDR"; then
+            echo "Setting IP address $IP_ADDR on bridge $NET_NAME"
+            sudo ip addr add "$IP_ADDR" dev "$NET_NAME"
+        else
+            echo "IP address $IP_ADDR already set on bridge $NET_NAME"
+        fi
     fi
+
+    # Configure firewall and NAT
+    configure_firewall "$NET_NAME" "${DEVICE_MAP[$br]}" "$id"
 
     # Check if virsh network exists
     XML_FILE="${XML_OUTPUT_DIR}/net-${br}.xml"
@@ -254,18 +264,18 @@ for bridge in "${BRIDGES[@]}"; do
     if [ -f "$XML_FILE" ]; then
         if ! virsh_net_exists $NET_NAME; then
             echo "Creating virsh network $NET_NAME from $XML_FILE"
-            virsh net-define "$XML_FILE"
-            virsh net-start $NET_NAME
-            virsh net-autostart $NET_NAME
+            sudo virsh net-define "$XML_FILE"
+            sudo virsh net-start $NET_NAME
+            sudo virsh net-autostart $NET_NAME
         else
             echo "Virsh network $NET_NAME already exists"
-            if ! virsh net-info $NET_NAME | grep -q "Active:.*yes"; then
+            if ! sudo  virsh net-info $NET_NAME | grep -q "Active:.*yes"; then
                 echo "Starting virsh network $NET_NAME"
-                virsh net-start $NET_NAME
+                sudo virsh net-start $NET_NAME
             fi
-            if ! virsh net-info $NET_NAME | grep -q "Autostart:.*yes"; then
+            if ! sudo virsh net-info $NET_NAME | grep -q "Autostart:.*yes"; then
                 echo "Setting virsh network $NET_NAME to autostart"
-                virsh net-autostart $NET_NAME
+                sudo virsh net-autostart $NET_NAME
             fi
         fi
     else
