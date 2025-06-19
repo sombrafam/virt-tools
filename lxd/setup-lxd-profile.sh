@@ -1,7 +1,25 @@
-#!/bin/bash
+#!/bin/bash -x
 set -eu
 _UID=$(id -u)
 GID=$(id -g)
+
+LXD_BRIDGE_NAME=""
+# Find the first active, managed LXD bridge network
+for net_name in $(lxc network list --format csv | awk -F, 'tolower($2)=="bridge" && tolower($3)=="yes" {print $1}'); do
+  # Ensure net_name is not empty before querying its state
+  if [ -n "$net_name" ]; then
+    # Check if the network status is 'Created'
+    if lxc network show "$net_name" 2>/dev/null | grep -q "^status: Created$"; then
+      LXD_BRIDGE_NAME="$net_name"
+      break
+    fi
+  fi
+done
+
+if [ -z "$LXD_BRIDGE_NAME" ]; then
+  echo "Error: Could not find an active, managed LXD bridge network. Please ensure one is set up and active." >&2
+  exit 1
+fi
 
 # give lxd permission to map your user/group id through
 grep root:$_UID:1 /etc/subuid -qs || sudo usermod --add-subuids ${_UID}-${_UID} --add-subgids ${GID}-${GID} root
@@ -11,10 +29,12 @@ grep root:$_UID:1 /etc/subuid -qs || sudo usermod --add-subuids ${_UID}-${_UID} 
 KEY=$HOME/.ssh/id_lxd_$USER
 PUBKEY=$KEY.pub
 AUTHORIZED_KEYS=$HOME/.ssh/authorized_keys
+
 [ -f $PUBKEY ] || ssh-keygen -f $KEY -N '' -C "key for local lxds"
 grep "$(cat $PUBKEY)" $AUTHORIZED_KEYS -qs || cat $PUBKEY >> $AUTHORIZED_KEYS
 
 # create a profile to control this, name it after $USER
+sudo lxc profile delete $USER &> /dev/null || true
 sudo lxc profile create $USER &> /dev/null || true
 
 # configure profile
@@ -37,9 +57,17 @@ config:
         sudo: ['ALL=(ALL) NOPASSWD:ALL']
     # ensure users shell is installed
     packages:
-      - $(dpkg -S $(readlink -m $SHELL) | cut -d: -f1)
-# this section adds your \$HOME directory into the container. This is useful for vim, bash and ssh config, and such like.
+      - bash
 devices:
+  eth0:
+    name: eth0
+    network: $LXD_BRIDGE_NAME
+    type: nic
+  root:
+    path: /
+    pool: default
+    type: disk
+# this section adds your \$HOME directory into the container. This is useful for vim, bash and ssh config, and such like.
   home:
     type: disk
     source: $HOME

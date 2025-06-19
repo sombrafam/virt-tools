@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash -ex
 
 export -A IMAGES=()
 BASE_FOLDER="${HOME}/VMScripts"
@@ -11,7 +11,8 @@ IMAGES["trusty"]="${IMAGE_FOLDER}/trusty-server-cloudimg-amd64-disk1.img"
 IMAGES["xenial"]="${IMAGE_FOLDER}/xenial-server-cloudimg-amd64-disk1.img"
 IMAGES["bionic"]="${IMAGE_FOLDER}/bionic-server-cloudimg-amd64.img"
 IMAGES["focal"]="${IMAGE_FOLDER}/focal-server-cloudimg-amd64.img"
-IMAGES["jammy"]="${IMAGE_FOLDER}/jammy-server-cloudimg-amd64-disk-kvm.img"
+IMAGES["jammy"]="${IMAGE_FOLDER}/jammy-server-cloudimg-amd64.img"
+IMAGES["centos7"]="${IMAGE_FOLDER}/CentOS-7-x86_64-GenericCloud.qcow2"
 
 usage() {
     echo "Usage: $0 --name <hostname> --vcpus <vcpus> --mem <memory MB> --disk <disk GB> [--series <trusty|xenial|bionic|focal|jammy>]"
@@ -99,8 +100,9 @@ else
     echo "Warning: Disk image already exists for vm with name ${VMNAME}"
 fi
 
-echo "Booting VM ..."
+
 if [ ${MAAS} == "true" ]; then
+    echo "Creating VM with MAAS support"
     # Chooses a random number, convert it to hex and get the first 2 digits.
     # There is a scarse change that we can colide MACs in the same network, but
     # given the complexity to manage that, it worh the risks given that changes
@@ -124,15 +126,13 @@ if [ ${MAAS} == "true" ]; then
                 --os-variant ubuntu18.04 \
                 --virt-type kvm \
                 --graphics spice \
-                --network=network=maas-oam,model=virtio,mac="52:54:00:${hex1}:${hex2}:10" \
                 --network=network=maas-admin,model=virtio,mac="52:54:00:${hex1}:${hex2}:20" \
                 --network=network=maas-public,model=virtio,mac="52:54:00:${hex1}:${hex2}:30" \
                 --network=network=maas-internal,model=virtio,mac="52:54:00:${hex1}:${hex2}:40" \
-                --network=network=maas-ext,model=virtio,mac="52:54:00:${hex1}:${hex2}:50" \
-                --network=network=maas-k8s,model=virtio,mac="52:54:00:${hex1}:${hex2}:60" \
                 --check path_in_use=off \
                 --noautoconsole
 else
+    echo "Creating VM with no MAAS support"
     sudo virt-install \
                 --name $VMNAME \
                 --memory $MEMORY \
