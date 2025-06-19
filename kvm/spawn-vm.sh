@@ -47,24 +47,41 @@ generate_random_hex() {
     printf '%02x' $((RANDOM % 256))
 }
 
-# Function to generate a unique MAC address with given prefix
+# Function to generate a MAC address
 generate_mac() {
-    local prefix=$1
-    local index=$2
-    # Generate 3 random bytes for the MAC address
+    local prefix="$1"
+    local index="$2"
+    local id="$3"
+    
+    # Generate two random bytes
     local byte1=$(generate_random_hex)
     local byte2=$(generate_random_hex)
-    local byte3=$(generate_random_hex)
-    # Format: 52:54:00:XX:XX:XX
-    echo "${prefix}:${byte1}:${byte2}:${byte3}"
+    
+    # If ID is provided, use it as the last byte, otherwise generate a random one
+    if [ -n "$id" ]; then
+        echo "${prefix}:${byte1}:${byte2}:${id}"
+    else
+        local byte3=$(generate_random_hex)
+        echo "${prefix}:${byte1}:${byte2}:${byte3}"
+    fi
 }
 
 usage() {
-    echo "Usage: $0 --name <hostname> --vcpus <vcpus> --mem <memory MB> --disk <disk GB>"
+    echo "Usage: $0 --name <name> --vcpus <vcpus> --mem <memory> --disk <size> [options]"
+    echo "Options:"
+    echo "  --name <name>                    Name of the VM"
+    echo "  --vcpus <vcpus>                  Number of virtual CPUs"
+    echo "  --mem <memory>                   Memory in MB"
+    echo "  --disk <size>                    Disk size in GB"
     echo "  [--series <trusty|xenial|bionic|focal|jammy>]"
-    echo "  [--maas]"
-    echo "  [--networks <network1>[,<network2>...]]  Comma-separated list of networks (e.g., maas-admin,maas-public,maas-internal)"
-    echo "  [--network-prefix <prefix>]             MAC address prefix (default: 52:54:00)"
+    echo "  [--maas]                         Enable MAAS support"
+    echo "  [--networks <network1:id1>[,<network2:id2>...]]"
+    echo "                                   Comma-separated list of networks with IDs"
+    echo "                                   Example: --networks public:30,admin:20,oam:10"
+    echo "                                   The ID is used in the MAC address generation"
+    echo "  [--network-prefix <prefix>]      MAC address prefix (default: 52:54:00)"
+    echo "  [--debug]                        Enable debug output"
+    echo "  [--help]                         Show this help message"
 }
 
 if [ -z $1 ] || [ -z $2 ]; then
@@ -103,7 +120,8 @@ while (($# > 0)); do
             MAAS=true
             ;;
         --networks)
-            IFS=',' read -ra NETWORKS <<< "$2"
+            # Split the comma-separated list into an array
+            IFS=',' read -r -a NETWORKS <<< "$2"
             shift
             ;;
         --network-prefix)
@@ -173,11 +191,18 @@ if [ ${MAAS} == "true" ]; then
     # Build network options for virt-install
     NETWORK_OPTS=()
     for i in "${!NETWORKS[@]}"; do
-        # Generate a unique MAC address for each network interface
-        # Use the index to make the last byte unique
-        mac=$(generate_mac "${NETWORK_PREFIX}" "$i")
-        NETWORK_OPTS+=("--network" "network=${NETWORKS[$i]},model=virtio,mac=$mac")
-        echo "Network ${NETWORKS[$i]} will use MAC: $mac"
+        # Parse network name and ID
+        IFS=':' read -r net_name net_id <<< "${NETWORKS[$i]}"
+        
+        if [ -z "$net_id" ]; then
+            echo "Warning: Network ${net_name} has no ID specified, using index as ID"
+            net_id=$i
+        fi
+        
+        # Generate a MAC address using the network ID
+        mac=$(generate_mac "${NETWORK_PREFIX}" "$i" "$net_id")
+        NETWORK_OPTS+=("--network" "network=${net_name},model=virtio,mac=$mac")
+        echo "Network ${net_name} with ID ${net_id} will use MAC: $mac"
     done
     
     # Check if host supports hardware virtualization
@@ -234,10 +259,18 @@ else
     if [ ${#NETWORKS[@]} -gt 0 ]; then
         echo "Using specified networks: ${NETWORKS[*]}"
         for i in "${!NETWORKS[@]}"; do
-            # Generate a unique MAC address for each network interface
-            mac=$(generate_mac "${NETWORK_PREFIX}" "$i")
-            NETWORK_OPTS+=("--network=network=${NETWORKS[$i]},model=virtio,mac=$mac")
-            echo "Network ${NETWORKS[$i]} will use MAC: $mac"
+            # Parse network name and ID
+            IFS=':' read -r net_name net_id <<< "${NETWORKS[$i]}"
+            
+            if [ -z "$net_id" ]; then
+                echo "Warning: Network ${net_name} has no ID specified, using index as ID"
+                net_id=$i
+            fi
+            
+            # Generate a MAC address using the network ID
+            mac=$(generate_mac "${NETWORK_PREFIX}" "$i" "$net_id")
+            NETWORK_OPTS+=("--network=network=${net_name},model=virtio,mac=$mac")
+            echo "Network ${net_name} with ID ${net_id} will use MAC: $mac"
         done
     else
         # Use the default network
