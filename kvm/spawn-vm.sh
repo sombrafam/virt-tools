@@ -234,8 +234,7 @@ if [ ${MAAS} == "true" ]; then
         --disk "path=${DISK_FOLDER}/vmdisk-${VMNAME}-01.qcow2,format=qcow2,device=disk,bus=sata"
         --disk "path=${DISK_FOLDER}/vmconfigs-${VMNAME}.iso,device=cdrom"
         --pxe
-        --boot hd,network
-        --os-type linux
+        --boot network,hd
         --os-variant ubuntu18.04
         --virt-type kvm
         --graphics spice
@@ -305,7 +304,6 @@ else
         --vcpus "$VCPUS"
         --disk "path=${DISK_FOLDER}/vmdisk-${VMNAME}.qcow2,format=qcow2,device=disk,bus=virtio"
         --disk "path=${DISK_FOLDER}/vmconfigs-${VMNAME}.iso,device=cdrom"
-        --os-type linux
         --os-variant ubuntu18.04
         --graphics spice
         --import
