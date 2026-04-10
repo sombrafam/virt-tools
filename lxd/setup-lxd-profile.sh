@@ -3,6 +3,28 @@ set -eu
 _UID=$(id -u)
 GID=$(id -g)
 
+# Install LXD snap if not already installed
+if ! snap list lxd &>/dev/null; then
+    sudo snap install lxd --channel=5/stable
+else
+    sudo snap refresh lxd --channel=5/stable 2>/dev/null || true
+fi
+
+# Add current user to the lxd group if not already a member
+if ! groups | grep -qw lxd; then
+    sudo usermod -aG lxd "$USER"
+    echo "Added $USER to lxd group. Activating group for this session..."
+fi
+
+# Activate lxd group in current shell without re-login
+# Wrap lxc so all calls run with the lxd group active
+lxc() { sg lxd -c "lxc $*"; }
+
+# Initialise LXD with defaults if no bridge network exists yet
+if ! lxc network list --format csv 2>/dev/null | awk -F, 'tolower($2)=="bridge"' | grep -q .; then
+    sudo lxd init --auto
+fi
+
 LXD_BRIDGE_NAME=""
 # Find the first active, managed LXD bridge network
 for net_name in $(lxc network list --format csv | awk -F, 'tolower($2)=="bridge" && tolower($3)=="yes" {print $1}'); do
@@ -34,12 +56,12 @@ AUTHORIZED_KEYS=$HOME/.ssh/authorized_keys
 grep "$(cat $PUBKEY)" $AUTHORIZED_KEYS -qs || cat $PUBKEY >> $AUTHORIZED_KEYS
 
 # create a profile to control this, name it after $USER
-sudo lxc profile delete $USER &> /dev/null || true
-sudo lxc profile create $USER &> /dev/null || true
+lxc profile delete $USER &> /dev/null || true
+lxc profile create $USER &> /dev/null || true
 
 # configure profile
 # this will rewrite the whole profile
-cat << EOF | sudo lxc profile edit $USER
+cat << EOF | lxc profile edit $USER
 name: $USER
 description: allow home dir mounting for $USER
 config:

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 usage() {
-    echo "Usage: $0 <container-name> [--series <trusty|xenial|bionic|focal|hirsute|impish|jammy>]"
+    echo "Usage: $0 <container-name> [--series <trusty|xenial|bionic|focal|hirsute|impish|jammy|noble>]"
 }
 
 if [ -z $1 ]; then
@@ -33,19 +33,19 @@ CWD=$(pwd)
 
 lxc info "${VMNAME}-${SERIES}" &> /dev/null
 if [[ $? -ne 0 ]]; then
-    sudo lxc launch --profile erlon ubuntu:${SERIES} ${VMNAME}-${SERIES}
+    sudo lxc launch --profile $USER ubuntu:${SERIES} ${VMNAME}-${SERIES}
 else
     echo "Container already exists"
 fi
 
 echo -n "Waiting for container to be mapped "
-sudo lxc exec "${VMNAME}-${SERIES}" cat /etc/passwd | grep erlon &> /dev/null
+sudo lxc exec "${VMNAME}-${SERIES}" cat /etc/passwd | grep $USER &> /dev/null
 while [ $? -ne 0 ]; do
     echo -n ". "
     sleep 0.5
-    sudo lxc exec "${VMNAME}-${SERIES}" cat /etc/passwd | grep erlon &> /dev/null
+    sudo lxc exec "${VMNAME}-${SERIES}" cat /etc/passwd | grep $USER &> /dev/null
 done
 echo "Done!"
 
 
-sudo lxc exec ${VMNAME}-${SERIES} su - erlon
+sudo lxc exec ${VMNAME}-${SERIES} su - $USER
